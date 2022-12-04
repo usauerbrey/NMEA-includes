@@ -69,6 +69,10 @@ struct tN2KDebugHandler {
 
 tN2KDebugHandler N2KDebugMsgs[] = {
 	{  60928UL, "ISO Address Claim" },
+	{  65359UL, "Pilot Heading (Raymarine)" },
+	{  65379UL, "Pilot Mode (Raymarine)" },
+	{  65384UL, "Heartbeat (Raymarine)" },
+	{ 126720UL, "Proprietary Message" },
 	{ 126993UL, "Heartbeat" },
 	{ 126992UL, "System Time" },
 	{ 127233UL, "Man Overboard Notification(MOB)" },
@@ -76,6 +80,7 @@ tN2KDebugHandler N2KDebugMsgs[] = {
 	{ 127245UL, "Rudder" },
 	{ 127250UL, "Vessel Heading" },
 	{ 127251UL, "Rate of Turn" },
+	{ 127257UL, "Vessel Attitude" },
 	{ 127258UL, "Magnetic Variation" },
 	{ 127488UL, "Engine Parameters, Rapid Update" },
 	{ 127489UL, "Engine Parameters, Dynamic" },
@@ -89,6 +94,10 @@ tN2KDebugHandler N2KDebugMsgs[] = {
 	{ 129026UL, "COG & SOG, Rapid Update" },
 	{ 129029UL, "GNSS Position Data" },
 	{ 129033UL, "Local Time Offset" },
+	{ 129038UL, "AIS Class A Position Report" },
+	{ 129039UL, "AIS Class B Position Report" },
+	{ 129040UL, "AIS Class B Extended Position Report" },
+	{ 129041UL, "AIS Aids to Navigation(AtoN) Report" },
 	{ 129044UL, "Datum" },
 	{ 129283UL, "Cross Track Error" },
 	{ 129284UL, "Navigation Data" },
@@ -96,6 +105,11 @@ tN2KDebugHandler N2KDebugMsgs[] = {
 	{ 129291UL, "Set & Drift, Rapid Update" },
 	{ 129539UL, "GNSS DOPs" },
 	{ 129540UL, "GNSS Sats in View" },
+	{ 129793UL, "AIS UTC and Date Report" },
+	{ 129794UL, "AIS Class A Static and Voyage Related Data" },
+	{ 129798UL, "AIS SAR Aircraft Position Report" },
+	{ 129809UL, "AIS Class B ""CS"" Static Data Report, Part A" },
+	{ 129810UL, "AIS Class B ""CS"" Static Data Report, Part B" },
 	{ 130066UL, "Route and WP Service — Route/WP, List Attributes" },
 	{ 130067UL, "Route and WP Service — Route, WP Name&Position" },
 	{ 130074UL, "Route and WP Service — WP List, WP Name&Position" },
@@ -106,21 +120,18 @@ tN2KDebugHandler N2KDebugMsgs[] = {
 	{ 130313UL, "Humidity" },
 	{ 130314UL, "Actual Pressure" },
 	{ 130316UL, "Temperature, Extended Range" },
-	{ 129038UL, "AIS Class A Position Report" },
-	{ 129039UL, "AIS Class B Position Report" },
-	{ 129040UL, "AIS Class B Extended Position Report" },
-	{ 129041UL, "AIS Aids to Navigation(AtoN) Report" },
-	{ 129793UL, "AIS UTC and Date Report" },
-	{ 129794UL, "AIS Class A Static and Voyage Related Data" },
-	{ 129798UL, "AIS SAR Aircraft Position Report" },
-	{ 129809UL, "AIS Class B ""CS"" Static Data Report, Part A" },
-	{ 129810UL, "AIS Class B ""CS"" Static Data Report, Part B" },
+	{ 130323UL, "Meteorological Station Data" },
+	{ 130577UL, "Direction Data" },
+	{ 130880UL, "Proprietary Message" },
+	{ 130916UL, "Proprietary Message" },
+	{ 130945UL, "Proprietary Message" },
 	{ 0,0 }
 };
 
 void tN2kDataToNMEA0183::HandleMsg(const tN2kMsg &N2kMsg) {
 	int i;
 	
+//	Serial.println("N2kRxCounter+1");
 	N2kRxCounter = N2kRxCounter + 1;
 	
 	if (N2kHandlersDebugStream != 0) {
@@ -136,33 +147,50 @@ void tN2kDataToNMEA0183::HandleMsg(const tN2kMsg &N2kMsg) {
 		}
     }
 
-/*
-	Serial1.print("N2k message parsed: ");
-	Serial1.print(N2kMsg.PGN);
+#ifdef debug
+	Serial.print("N2k message parsed: ");
+	Serial.print(N2kMsg.PGN);
 
 	// Find debug msg
 	for (i = 0; (N2KDebugMsgs[i].PGN != 0 && N2KDebugMsgs[i].PGN != N2kMsg.PGN); i++);
 
 	if (N2KDebugMsgs[i].PGN != 0) {
-		Serial1.print(" - ");
-		Serial1.println(N2KDebugMsgs[i].N2KMsg);
+		Serial.print(" - ");
+		Serial.println(N2KDebugMsgs[i].N2KMsg);
 	}
-*/
+#endif
 
 	switch (N2kMsg.PGN) {
-		case 127250UL: HandleHeading(N2kMsg);    // -> HDG
-	    case 127258UL: HandleVariation(N2kMsg);  // store variation
-		case 128259UL: HandleBoatSpeed(N2kMsg);  // -> VHW
-	    case 128267UL: HandleDepth(N2kMsg);      // -> DBT
-		case 129025UL: HandlePosition(N2kMsg);   // -> GLL
-	    case 129026UL: HandleCOGSOG(N2kMsg);     // -> VTG
-//		case 129029UL: HandleGNSS(N2kMsg);       // -> GGA, GLL
-		case 129283UL: HandleXTE(N2kMsg);        // -> XTE
-		case 130306UL: HandleWindSpeed(N2kMsg);  // -> MWV
-		case 126996UL: HandleSysTime(N2kMsg);    // -> ZDA
-//		case 128275UL: HandleLog(N2kMsg);        // -> VLW
-//		case 127245UL: HandleRudder(N2kMsg);     // -> RSA
-	}
+		case 127250UL: HandleHeading(N2kMsg); break;   // -> HDG
+	    case 127258UL: HandleVariation(N2kMsg); break; // store variation
+		case 128259UL: HandleBoatSpeed(N2kMsg); break; // -> VHW
+	    case 128267UL: HandleDepth(N2kMsg); break;     // -> DBT
+		case 129025UL: HandlePosition(N2kMsg); break;  // -> GLL
+	    case 129026UL: HandleCOGSOG(N2kMsg); break;    // -> VTG
+		case 129029UL: HandleGNSS(N2kMsg); break;      // -> GGA, GLL
+		case 129283UL: HandleXTE(N2kMsg); break;       // -> XTE
+		case 130306UL: HandleWindSpeed(N2kMsg); break; // -> MWV, MWD
+		case 126996UL: HandleSysTime(N2kMsg); break;   // -> ZDA
+		case 128275UL: HandleLog(N2kMsg); break;       // -> VLW
+		case 127245UL: HandleRudder(N2kMsg); break;    // -> RSA
+		case 130311UL: HandleEnv(N2kMsg); break;       // -> XDR
+		case  60928UL: break;                          // ISO Address Claim
+		case 126993UL: break;                          // Heartbeat
+
+#ifdef debug
+		default:
+			Serial.print("NMEA2000 message parsed, no Handler found: ");
+			Serial.print(N2kMsg.PGN);
+			// Find debug msg
+			for (i = 0; (N2KDebugMsgs[i].PGN != 0 && N2KDebugMsgs[i].PGN != N2kMsg.PGN); i++);
+
+			if (N2KDebugMsgs[i].PGN != 0) {
+				Serial.print(" - ");
+				Serial.print(N2KDebugMsgs[i].N2KMsg);
+			}
+			Serial.println("");
+#endif
+		}
 }
 
 /*
@@ -201,7 +229,7 @@ NMEA 2000 PGN											NMEA 0183						Comment
 130074 Route and WP Service — WP List, WP Name&Position WPL
 *130306 Wind Data										MWD, MWV						See note (3). Also used in MDA. => MWV
 130310 Environmental Parameters							XDR, MTW, MDA					See note (1), (5)
-130311 Environmental Parameters							XDR, MTW, MDA					See notes (1), (2), (5)
+*130311 Environmental Parameters						XDR, MTW, MDA					See notes (1), (2), (5)
 130312 Temperature										XDR, MTW, MDA					See notes (1), (2), (5)
 130313 Humidity											XDR, MDA						See notes (1), (2), (5)
 130314 Actual Pressure									XDR, MDA						See notes (1), (2), (5)
@@ -513,6 +541,10 @@ void tN2kDataToNMEA0183::HandleWindSpeed(const tN2kMsg &N2kMsg) {
 				SendMessage(NMEA0183Msg);
 				NMEA0183TxCounter = NMEA0183TxCounter + 1;
 			}
+			if (NMEA0183SetMWD(NMEA0183Msg, RadToDeg(WindAngle), WindSpeed)) {
+				SendMessage(NMEA0183Msg);
+				NMEA0183TxCounter = NMEA0183TxCounter + 1;
+			}
 		}
 	}
 }
@@ -769,5 +801,45 @@ void tN2kDataToNMEA0183::HandleRudder(const tN2kMsg &N2kMsg) {
 		if (!NMEA0183Msg.AddStrField("A")) return;
 
 		SendMessage(NMEA0183Msg);
+	}
+}
+
+//*****************************************************************************
+void tN2kDataToNMEA0183::HandleEnv(const tN2kMsg &N2kMsg) {
+
+	unsigned char SID;
+	tN2kTempSource TempSource;
+	double Temperature;
+	tN2kHumiditySource HumiditySource;
+	double Humidity;
+	double AtmosphericPressure;
+
+	if (ParseN2kEnvironmentalParameters(N2kMsg, SID, TempSource, Temperature, HumiditySource, Humidity, AtmosphericPressure)) {
+		tNMEA0183Msg NMEA0183Msg;
+/*
+		Serial.println("HandleEnv");
+		Serial.println(TempSource);
+		Serial.println(AtmosphericPressure/100000.0);
+*/
+		if (TempSource == N2kts_SeaTemperature) {
+//			if (NMEA0183SetXDR(NMEA0183Msg, 1, Temperature, "SEA")) {
+			if (NMEA0183SetMTW(NMEA0183Msg, Temperature)) {
+					SendMessage(NMEA0183Msg);
+				NMEA0183TxCounter = NMEA0183TxCounter + 1;
+			}
+		}
+		if (TempSource == N2kts_OutsideTemperature) {
+			if (NMEA0183SetXDR(NMEA0183Msg, 1, Temperature, "AIR")) {
+				SendMessage(NMEA0183Msg);
+				NMEA0183TxCounter = NMEA0183TxCounter + 1;
+			}
+		}
+		if (AtmosphericPressure != NMEA0183DoubleNA) {
+			if (NMEA0183SetXDR(NMEA0183Msg, 2, AtmosphericPressure, "Barometer")) {
+				SendMessage(NMEA0183Msg);
+				NMEA0183TxCounter = NMEA0183TxCounter + 1;
+			}
+		}
+
 	}
 }

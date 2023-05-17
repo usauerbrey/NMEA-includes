@@ -414,7 +414,7 @@ void HandleRMB(const tNMEA0183Msg &NMEA0183Msg) {
 			NMEA0183HandlersDebugStream->print("destID="); NMEA0183HandlersDebugStream->println(destID);
 		}
 */
-
+/*
 		if (atoi(originID) == 0) {
 			originIDi = int(originID[0]) * 100 + int(originID[1]);
 		}
@@ -438,24 +438,54 @@ void HandleRMB(const tNMEA0183Msg &NMEA0183Msg) {
 //		Serial1.print(destID);
 //		Serial1.print(", ");
 //		Serial1.println(destIDi);
+*/
 
 /*
 RMB		129283 Cross Track Error
-		129284 Navigation Data
-		129285 Navigation � Route / WP information
+  		129284 Navigation Data
+This parameter group provides essential navigation data for following a route.  Transmissions will originate from products that can
+create and manage routes using waypoints. This information is intended for navigational repeaters.
+Field # Field Description
+1 Sequence ID
+2 Distance to Destination Waypoint
+3 Course/Bearing Ref.
+4 Perpendicular Crossed
+5 Arrival Circle Entered
+6 Calculation Type
+7 ETA Time
+8 ETA Date
+9 Bearing, Origin To Destination Waypoint
+10 Bearing, Position To Destination Waypoint
+11 Origin Waypoint Number
+12 Destination Waypoint Number
+13 Destination Wpt Latitude
+14 Destination Wpt Longitude
+15 Waypoint Closing Velocity
 */
 		if (pNMEA2000 != 0) {
 			tN2kMsg N2kMsg;
-			SetN2kXTE(N2kMsg, 1, N2kxtem_Autonomous, false, nmTom*XTE);
+			SetN2kXTE(N2kMsg, 1, N2kxtem_Autonomous, false, nmTom*XTE);       // PGN 129283
 			pNMEA2000->SendMsg(N2kMsg);
 			N2kTxCounter = N2kTxCounter + 1;
-			
+
+			// Navigation data
+			//void SetN2kPGN129284(tN2kMsg &N2kMsg, unsigned char SID, double DistanceToWaypoint, tN2kHeadingReference BearingReference,
+			//	bool PerpendicularCrossed, bool ArrivalCircleEntered, tN2kDistanceCalculationType CalculationType,
+			//	double ETATime, int16_t ETADate, double BearingOriginToDestinationWaypoint, double BearingPositionToDestinationWaypoint,
+			//	uint8_t OriginWaypointNumber, uint8_t DestinationWaypointNumber,
+			//	double DestinationLatitude, double DestinationLongitude, double WaypointClosingVelocity)
+				SetN2kPGN129284(N2kMsg, 1, DTW*nmTom, N2khr_true, false, false, N2kdct_GreatCircle, 0, 0,
+					BTW*degToRad, BTW*degToRad, 1, 2, Latitude, Longitude, 5* knToms);
+				pNMEA2000->SendMsg(N2kMsg);
+				N2kTxCounter = N2kTxCounter + 1;
+
+
 			//3B 9F D1 47 4F 54 4F 20 43 55 52 53 4F 52 00 00 00 00 00 30 30 30 31 8A 72 0F 6F 54 B6 09 00 FF
 			//3B9F2B474F544F20435552534F52000000000030303031 CA594F 56 2447 0800FF
 			//3B9FF0474F544F20435552534F52203200383730303032 CF6F54 6C 345B 0700FF
 			//3B9FB5474F544F20435552534F52203300353130303033 7954FE 50 E004 0700FF
 
-			N2kMsg.SetPGN(130848UL);
+			N2kMsg.SetPGN(130848UL);    // Raymarine proprietary PGN 130848
 			N2kMsg.Priority = 7;
 			N2kMsg.Destination = 255;
 			N2kMsg.AddByte(0x3b);  // lower 8 Bit of Manufacturer Code, Raymarine=1851=0x073b
@@ -469,11 +499,8 @@ RMB		129283 Cross Track Error
 //			Serial.print("DTW="); Serial.println(DTW);
 //			Serial.print("BTW="); Serial.println(BTW);
 
-			N2kMsg.AddByte(BTW / 0.0057);  // 1:0.0057°
-			N2kMsg.AddByte(BTW / 1.466);   // BTW for MFD Axiom Pro 9 (Waypoint) and for i70, Bearing Mode in Unit setting must be set to TRUE
-
-			N2kMsg.AddByte(BTW / 0.0057);  // 1:0.0057°
-			N2kMsg.AddByte(BTW / 1.466);   // BTW for AutoPilot  1=1.466° 8:12°, 16:23°, 127:186°, 160:235, 192:282°, 224:329°, 240:352°, 241:353
+			N2kMsg.Add2ByteUInt(BTW*174.5);  // BTW for MFD Axiom Pro 9 (Waypoint) and for i70, Bearing Mode in Unit setting must be set to TRUE
+			N2kMsg.Add2ByteUInt(BTW*174.5);  // 1:0.0057° => 1/0.0057=174
 
 			N2kMsg.Add4ByteUDouble(DTW*nmTom, 0.01);   // DTW in m
 
@@ -489,7 +516,7 @@ RMB		129283 Cross Track Error
 			//3B9F0200474F544F20435552534F522032003837FF00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0DFFFFFFFFFFFFFFFF
 			//3B9F0300474F544F20435552534F522033003531FF00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF0DFFFFFFFFFFFFFFFF
 
-			N2kMsg.SetPGN(130918UL);
+			N2kMsg.SetPGN(130918UL);    // Raymarine proprietary PGN 130918
 			N2kMsg.Priority = 7;
 			N2kMsg.Destination = 255;
 			N2kMsg.AddByte(0x3b);  // lower 8 Bit of Manufacturer Code, Raymarine=1851=0x073b

@@ -18,7 +18,7 @@ Author: Timo Lappalainen
 #include <N2kMessages.h>
 #include <NMEA0183Messages.h>
 #include "NMEA0183Handlers.h"
-#include <AIS.h>
+#include "AIS.h"
 
 #define pi 3.1415926535897932384626433832795
 #define kmhToms 1000.0 / 3600.0
@@ -334,6 +334,7 @@ void HandleNMEA0183Msg(const tNMEA0183Msg &NMEA0183Msg) {
 		  NMEA0183HandlersDebugStream->print(" - ");
 		  NMEA0183HandlersDebugStream->println(NMEA0183Handlers[iHandler].NMEA0183seq);
 	  }
+
 /*
 	  Serial.print("NMEA0183 message parsed: ");
 	  Serial.print(NMEA0183Handlers[iHandler].Code);
@@ -393,8 +394,8 @@ void HandleRMB(const tNMEA0183Msg &NMEA0183Msg) {
 	char arrivalAlarm;
 	char originID[NMEA0183_MAX_WP_NAME_LENGTH];
 	char destID[NMEA0183_MAX_WP_NAME_LENGTH];
-	int originIDi;
-	int destIDi;
+//	int originIDi;
+//	int destIDi;
 
 //	if (NMEA0183HandlersDebugStream != 0) { NMEA0183HandlersDebugStream->print("NMEA0183Msg="); NMEA0183HandlersDebugStream->println(NMEA0183Msg->Data[MAX_NMEA0183_MSG_LEN]); }
 
@@ -474,10 +475,10 @@ Field # Field Description
 			//	double ETATime, int16_t ETADate, double BearingOriginToDestinationWaypoint, double BearingPositionToDestinationWaypoint,
 			//	uint8_t OriginWaypointNumber, uint8_t DestinationWaypointNumber,
 			//	double DestinationLatitude, double DestinationLongitude, double WaypointClosingVelocity)
-				SetN2kPGN129284(N2kMsg, 1, DTW*nmTom, N2khr_true, false, false, N2kdct_GreatCircle, 0, 0,
-					BTW*degToRad, BTW*degToRad, 1, 2, Latitude, Longitude, 5* knToms);
-				pNMEA2000->SendMsg(N2kMsg);
-				N2kTxCounter = N2kTxCounter + 1;
+//				SetN2kPGN129284(N2kMsg, 1, DTW*nmTom, N2khr_true, false, false, N2kdct_GreatCircle, 0, 0,
+//					BTW*degToRad, BTW*degToRad, 1, 2, Latitude, Longitude, 5* knToms);
+//				pNMEA2000->SendMsg(N2kMsg);
+//				N2kTxCounter = N2kTxCounter + 1;
 
 
 			//3B 9F D1 47 4F 54 4F 20 43 55 52 53 4F 52 00 00 00 00 00 30 30 30 31 8A 72 0F 6F 54 B6 09 00 FF
@@ -913,7 +914,7 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
     static char bitstream_total[512] = "";
 	unsigned int fillBits;
 
-//	uint8_t msgType;
+	enum AIS::Nmea0183AisMessages msgType;
 	unsigned int msgNumeric;
 	uint8_t part_no;
 	uint8_t repeat;
@@ -945,6 +946,7 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 	uint8_t day;
 	uint8_t hour;
 	uint8_t minute;
+	uint8_t aidtype;
 	char name[120];
 	char *shipname = name;
 	char dest[20];
@@ -965,6 +967,7 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 	if (NMEA0183ParseVDM_nc(NMEA0183Msg, pkgCnt, pkgNmb, seqMessageId, channel, length, bitstream, fillBits)) {
 
 //#define AIS_DEBUG
+
 #ifdef AIS_DEBUG
 		Serial.print("pkgCnt="); Serial.println(pkgCnt);
 		Serial.print("pkgNmb="); Serial.println(pkgNmb);
@@ -1058,183 +1061,186 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 			AIS ais_msg(bitstream, fillBits);
 //			AIS ais_msg("55Mf@6P00001MUS;7GQL4hh61L4hh6222222220t41H");
 
-			enum AIS::Nmea0183AisMessages msgType = ais_msg.get_type();
 			msgType = ais_msg.get_type();
 			msgNumeric = ais_msg.get_numeric_type();
 			part_no = ais_msg.get_partno();
 			repeat = ais_msg.get_repeat();
 			mmsi = ais_msg.get_mmsi();
 
-//#ifdef AIS_DEBUG
+#ifdef AIS_DEBUG
 			Serial.print("msgType="); Serial.println(msgType);
 			Serial.print("msgNumeric="); Serial.println(msgNumeric);
 			Serial.print("part_no="); Serial.println(part_no);
 			Serial.print("repeat="); Serial.println(repeat);
 			Serial.print("mmsi="); Serial.println(mmsi);
-//#endif
+#endif
 			if ((msgNumeric == 1) || (msgNumeric == 2) || (msgNumeric == 3)) {
+				// Message 1,2,3 - Position Report
+				// !AIVDM,1,1,,A,13u?etPv2;0n:dDPwUM1U1Cb069D,0*24
 				// 129038 AIS Class A Position Report			AIS VHF messages 1, 2, 3
-				/*
-				Message 1,2,3 - Position Report
-				!AIVDM,1,1,,A,13u?etPv2;0n:dDPwUM1U1Cb069D,0*23 (ERROR: CHECKSUM = 24)
-				Parm#	Parameter			Value	Description
-				01		Message ID				1	
-				02		Repeat indicator		0	No repeat (default)
-				03		User ID (MMSI)	265547250	
-				04		Navigational status		0	Under way using engine
-				05		Rate of turn ROTAIS	-2.9	
-				06		SOG					13.9	
-				07		Position accuracy		0	Low (> 10 m) (default)
-				08		Longitude		11.8329767	
-				09		Latitude		57.6603533	
-				10		COG					40.4	
-				11		True heading		41	
-				12		Time stamp			53	
-				13		Special manoeuvre indicator	0	
-				14		Spare					0	
-				15		RAIM-flag				0	RAIM not in use (default)
+
+				/*	
+					Parm#	Parameter			Value			Description
+					01		Message ID				1	
+					02		Repeat indicator		0			No repeat (default)
+					03		User ID (MMSI)			265547250	
+					04		Navigational status		0			Under way using engine
+					05		Rate of turn ROTAIS		-2.86	
+					06		SOG						13.9	
+					07		Position accuracy		0			Low (> 10 m) (default)
+					08		Longitude				11.8329767	
+					09		Latitude				57.6603533	
+					10		COG						40.4	
+					11		True heading			41	
+					12		Time stamp				53	
+					13		Special manoeuvre indicator	0	
+					14		Spare					0	
+					15		RAIM-flag				0			RAIM not in use (default)
 
 				AIS Class A Position Report 129038
 				This parameter group provides data associated with the ITU-R M.1371 Messages 1, 2, and 3 Position Reports, autonomous,
 				assigned, and response to interrogation, respectively. An AIS device may generate this parameter group either upon receiving a
 				VHF data link message 1,2 or 3, or upon receipt of an ISO or NMEA request PGN (see ITU-R M.1371-1 for additional information).
-				Field #	Field Description
-				1		Message ID
-				2		Repeat Indicator
-				3		User ID
-				4		Longitude
-				5		Latitude
-				6		Position Accuracy
-				7		RAIM-flag
-				8		Time Stamp
-				9		COG
-				10		SOG
-				11		Communication State
-				12		AIS Transceiver Information
-				13		True Heading
-				14		Rate of Turn
-				15		Navigational Status
-				16		Special Maneuver Indicator
-				17		NMEA Reserved
-				18		AIS Spare
-				19		NMEA Reserved
-				20		Sequence ID
+					Field #	Field Description
+					1		Message ID
+					2		Repeat Indicator
+					3		User ID
+					4		Longitude
+					5		Latitude
+					6		Position Accuracy
+					7		RAIM-flag
+					8		Time Stamp
+					9		COG
+					10		SOG
+					11		Communication State
+					12		AIS Transceiver Information
+					13		True Heading
+					14		Rate of Turn
+					15		Navigational Status
+					16		Special Maneuver Indicator
+					17		NMEA Reserved
+					18		AIS Spare
+					19		NMEA Reserved
+					20		Sequence ID
 				*/
 
-				LAT = ais_msg.get_latitude();
-				LONG = ais_msg.get_longitude();
-				LAT1 = MinToDegrees(LAT);
-				LONG1 = MinToDegrees(LONG);
-				COG = ais_msg.get_COG();
-				SOG = ais_msg.get_SOG();
-				HDG = ais_msg.get_HDG();
+				navstatus = ais_msg.get_navStatus();
 				ROT = ais_msg.get_rot();
 				ROT1 = (double)ROT / 4.733;
 				ROT1 = ROT1 * ROT1;
 				if (ROT < 0) {
 					ROT1 = -ROT1;
 				}
-				navstatus = ais_msg.get_navStatus();
+				SOG = ais_msg.get_SOG();
 				accuracy = ais_msg.get_posAccuracy_flag();
-				raim = ais_msg.get_raim_flag();
+				LONG = ais_msg.get_longitude();
+				LONG1 = MinToDegrees(LONG);
+				LAT = ais_msg.get_latitude();
+				LAT1 = MinToDegrees(LAT);
+				COG = ais_msg.get_COG();
+				HDG = ais_msg.get_HDG();
 				seconds = ais_msg.get_timeStamp();
+				raim = ais_msg.get_raim_flag();
 
-//#ifdef AIS_DEBUG
+#ifdef AIS_DEBUG
 				Serial.print("navstatus="); Serial.println(navstatus);
 				Serial.print("ROT="); Serial.println(ROT1);
-				Serial.print("SOG="); Serial.println(SOG);
-				Serial.print("accuracy="); Serial.println(accuracy);
+				Serial.print("SOG="); Serial.print(SOG / 10); Serial.print("."); Serial.println(SOG % 10);
+				Serial.print("Accuracy="); Serial.println(accuracy);
 				Serial.print("LONG="); Serial.println(LONG1);
 				Serial.print("LAT="); Serial.println(LAT1);
-				Serial.print("COG="); Serial.println(COG);
+				Serial.print("COG="); Serial.print(COG/10); Serial.print("."); Serial.println(COG % 10);
 				Serial.print("HDG="); Serial.println(HDG);
 				Serial.print("seconds="); Serial.println(seconds);
 				Serial.print("raim="); Serial.println(raim);
-//#endif
+#endif
 				SetN2kPGN129038(N2kMsg, seqMessageId, static_cast<tN2kAISRepeat>(repeat), mmsi, LAT1, LONG1,
-					accuracy, raim, seconds, COG*degToRad / 10, SOG*knToms / 10, N2kaischannel_A_VDL_reception, HDG*degToRad, ROT1*degToRad, static_cast<tN2kAISNavStatus>(navstatus));
+					accuracy, raim, seconds, COG*degToRad / 10, SOG*knToms / 10, N2kaischannel_A_VDL_reception,
+					HDG*degToRad, ROT1*degToRad, static_cast<tN2kAISNavStatus>(navstatus));
 				pNMEA2000->SendMsg(N2kMsg);
 				N2kTxCounter = N2kTxCounter + 1;
 			}
 //			else if ((msgNumeric == 4) || (msgNumeric == 11)) {
 			else if (msgNumeric == 4) {
+				// Message 4 - Base station report
+				// !AIVDM,1,1,,A,400TcdiuiT7VDR>3nIfr6>i00000,0*78
 				// 129793 AIS Base Station Report				AIS VHF message 4
+
 				// 129793 AIS UTC / Date Response				AIS VHF message 11
+
 				/*
-				Message 4 - Base station report
-				!AIVDM,1,1,,A,400TcdiuiT7VDR>3nIfr6>i00000,0*78
-				Parm#	Parameter		Value	Description
-				01		Message ID			4
-				02		Repeat indicator	0	No repeat (default)
-				03		User ID (MMSI)	000601011
-				04		UTC Year		2012
-				05		UTC Month			6
-				06		UTC Day				8
-				07		UTC Hour			7
-				08		UTC Minute			38
-				09		UTC Second			20
-				10		Position accuracy	1	High (< 10 m; Differential Mode)
-				11		Longitude		31*2.0108'E
-				12		Latitude		29*52.2501'S
-				13		EPFD Type			1	GPS
-				14		Spare				0
-				15		RAIM-flag			0	RAIM not in use (default)
+					Parm#	Parameter			Value	Description
+					01		Message ID			4
+					02		Repeat indicator	0		No repeat (default)
+					03		User ID (MMSI)		000601011
+					04		UTC Year			2012
+					05		UTC Month			6
+					06		UTC Day				8
+					07		UTC Hour			7
+					08		UTC Minute			38
+					09		UTC Second			20
+					10		Position accuracy	1		High (< 10 m; Differential Mode)
+					11		Longitude			31*2.0108'E
+					12		Latitude			29*52.2501'S
+					13		EPFD Type			1		GPS
+					14		Spare				0
+					15		RAIM-flag			0		RAIM not in use (default)
 
-				Message 11 - Mobile UTC and date response
-				!AIVDM,1,1,,B,;8u:8CAuiT7Bm2CIM=fsDJ100000,0*51
-				Parm# Parameter			Value		Description
-				01	Message ID			11
-				02	Repeat indicator	 0			No repeat (default)
-				03	User ID (MMSI)		601000013
-				04	UTC Year			2012
-				05	UTC Month			6
-				06	UTC Day				8
-				07	UTC Hour			7
-				08	UTC Minute			18
-				09	UTC Second			53
-				10	Position accuracy	0			Low (> 10 m) (default)
-				11	Longitude			32*11.9718'E
-				12	Latitude			29*50.2488'S
-				13	EPFD Type			1			GPS
-				14	Spare				0
-				15	RAIM-flag			0			RAIM not in use (default)
+					Message 11 - Mobile UTC and date response
+					!AIVDM,1,1,,B,;8u:8CAuiT7Bm2CIM=fsDJ100000,0*51
+					Parm#	Parameter			Value	Description
+					01		Message ID			11
+					02		Repeat indicator	0		No repeat (default)
+					03		User ID (MMSI)		601000013
+					04		UTC Year			2012
+					05		UTC Month			6
+					06		UTC Day				8
+					07		UTC Hour			7
+					08		UTC Minute			18
+					09		UTC Second			53
+					10		Position accuracy	0		Low (> 10 m) (default)
+					11		Longitude			32*11.9718'E
+					12		Latitude			29*50.2488'S
+					13		EPFD Type			1		GPS
+					14		Spare				0
+					15		RAIM-flag			0		RAIM not in use (default)
 
-				AIS UTC and Date Report 129793
-				This parameter group provides data from ITU-R M.1371 message 4 Base Station Report providing position, time, date, and current
-				slot number of a base station, and 11 UTC and date response message providing current UTC and date if available. An AIS device
-				may generate this parameter group either upon receiving a VHF data link message 4 or 11, or upon receipt of an ISO or NMEA
-				request PGN.
-				Field#	Field Description
-				1		Message ID
-				2		Repeat Indicator
-				3		User ID
-				4		Longitude
-				5		Latitude
-				6		Position accuracy
-				7		RAIM-flag
-				8		NMEA 2000 Reserved
-				9		Position time
-				10		Communication State
-				11		AIS Transceiver Information
-				12		Position Date
-				13		NMEA 2000 Reserved
-				14		Type of Electronic Positioning Device
-				15		Spare
+					AIS UTC and Date Report 129793
+					This parameter group provides data from ITU-R M.1371 message 4 Base Station Report providing position, time, date, and current
+					slot number of a base station, and 11 UTC and date response message providing current UTC and date if available. An AIS device
+					may generate this parameter group either upon receiving a VHF data link message 4 or 11, or upon receipt of an ISO or NMEA
+					request PGN.
+					Field#	Field Description
+					1		Message ID
+					2		Repeat Indicator
+					3		User ID
+					4		Longitude
+					5		Latitude
+					6		Position accuracy
+					7		RAIM-flag
+					8		NMEA 2000 Reserved
+					9		Position time
+					10		Communication State
+					11		AIS Transceiver Information
+					12		Position Date
+					13		NMEA 2000 Reserved
+					14		Type of Electronic Positioning Device
+					15		Spare
 				*/
 
-				LAT = ais_msg.get_latitude();
-				LONG = ais_msg.get_longitude();
-				LAT1 = MinToDegrees(LAT);
-				LONG1 = MinToDegrees(LONG);
-				accuracy = ais_msg.get_posAccuracy_flag();
-				raim = ais_msg.get_raim_flag();
 				year = ais_msg.get_year();
 				month = ais_msg.get_month();
 				day = ais_msg.get_day();
 				hour = ais_msg.get_hour();
 				minute = ais_msg.get_minute();
 				seconds = ais_msg.get_timeStamp();
+				accuracy = ais_msg.get_posAccuracy_flag();
+				LONG = ais_msg.get_longitude();
+				LAT = ais_msg.get_latitude();
+				LONG1 = MinToDegrees(LONG);
+				LAT1 = MinToDegrees(LAT);
 				epfd = ais_msg.get_epfd();
+				raim = ais_msg.get_raim_flag();
 
 #ifdef AIS_DEBUG
 				Serial.print("year="); Serial.println(year);
@@ -1255,7 +1261,59 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				N2kTxCounter = N2kTxCounter + 1;
 			}
 			else if (msgNumeric == 5) {
+				// !AIVDM,2,1,0,A,58wt8Ui`g??r21`7S=:22058<v05Htp000000015>8OA;0sk,0*7B
+				// !AIVDM,2,2,0,A,eQ8823mDm3kP00000000000,2*5D
 				// 129794 AIS Class A Static+Voyage Rel Data	AIS VHF message 5
+
+				/*
+					Parm#	Parameter				Value		Description
+					01		Message ID				5
+					02		Repeat indicator		0			No repeat (default)
+					03		User ID (MMSI)			603916439
+					04		AIS version indicator	0
+					05		IMO number				439303422
+					06		Call sign				ZA83R
+					07		Name					ARCO AVON@@@@@@@@
+					08		Type of ship & cargo	69			Passenger, No additional information
+					09		Ship dimensions			A=113,B=31,C=17,D=11
+					10		Type of EPFD			0			Undefined (default)
+					11		ETA Month				3
+					12		ETA Day					23
+					13		ETA Hour				19
+					14		ETA Minute				45
+					15		Max. static draught		13.2
+					16		Destination				HOUSTON@@@@@@@@@@@
+					17		DTE (availability)		0			DTE available
+					18		Spare					0
+
+					AIS Class A Static and Voyage Related Data 129794
+					This parameter group provides data associated with the ITU-R M.1371 Message 5 Ship Static and Voyage Related Data
+					Message.  An AIS device may generate this parameter group either upon receiving a VHF data link message 5, or upon receipt of
+					an ISO or NMEA request PGN.
+					Field#  Field Description
+					1		Message ID
+					2		Repeat Indicator
+					3		User ID
+					4		IMO
+					5		Call Sign
+					6		Name
+					7		Ship/Cargo Type
+					8		Ship Length
+					9		Ship Beam
+					10		Position Reference Point from Starboard
+					11		Position Reference Point aft of Ship's Bow
+					12		Estimated Date of Arrival
+					13		Estimated Time of Arrival
+					14		Draft
+					15		Destination
+					16		AIS Version
+					17		Type of Electronic Positioning Device
+					18		Data Terminal Equipment (DTE)
+					19		AIS Spare
+					20		AIS Transceiver Information
+					21		NMEA Reserved
+					22		Sequence ID
+				*/
 
 				imo = ais_msg.get_imo();
 				callsign = (char *)ais_msg.get_callsign();
@@ -1273,7 +1331,7 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				draught = ais_msg.get_draught();
 				destination = (char *)ais_msg.get_destination();
 
-//#ifdef AIS_DEBUG
+#ifdef AIS_DEBUG
 				Serial.print("imo="); Serial.println(imo);
 				Serial.print("callsign="); Serial.println(callsign);
 				Serial.print("shipname="); Serial.println(shipname);
@@ -1283,15 +1341,13 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				Serial.print("to_port="); Serial.println(to_port);
 				Serial.print("to_starboard="); Serial.println(to_starboard);
 				Serial.print("epfd="); Serial.println(epfd);
-//				Serial.print("year(now)="); Serial.println(year());
 				Serial.print("month="); Serial.println(month);
-//				Serial.print("month(now)="); Serial.println(month());
 				Serial.print("day="); Serial.println(day);
 				Serial.print("hour="); Serial.println(hour);
 				Serial.print("minute="); Serial.println(minute);
 				Serial.print("draught="); Serial.print(draught / 10); Serial.print("."); Serial.println(draught % 10);
 				Serial.print("destination="); Serial.println(destination);
-//#endif
+#endif
 				SetN2kPGN129794(N2kMsg, seqMessageId, static_cast<tN2kAISRepeat>(repeat), mmsi, imo, callsign, shipname, shiptype,
 					to_bow + to_stern, to_port + to_starboard, to_starboard, to_bow, (2021 - 1970) * 365 + month * 30 + day,
 					(double)hour * 3600 + (double)minute * 60, (double)draught / 10, destination, 
@@ -1300,6 +1356,7 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				pNMEA2000->SendMsg(N2kMsg);
 				N2kTxCounter = N2kTxCounter + 1;
 			}
+#ifdef AIRCRAFT
 			else if (msgNumeric == 9) {
 			// !AIVDM,1,1,,A,90009E?www<tSF0l4Q@>4?h20`GU,0*12
 			// 129798 AIS SAR Aircraft Position Report		AIS VHF message 9
@@ -1329,61 +1386,53 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				This parameter group provides data associated with the ITU - R M.1371 Message 9 SAR Aircraft Position Report Message for
 				Airborne AIS units conducting Search and Rescue operations.An AIS device may generate this parameter group either upon
 				receiving a VHF data link message 9, or upon receipt of an ISO or NMEA request.
-				Field # Field Description
-				1 Message ID
-				2 Repeat Indicator
-				3 User ID
-				4 Longitude
-				5 Latitude
-				6 Position Accuracy
-				7 RAIM - Flag
-				8 Time Stamp
-				9 COG
-				10 SOG
-				11 Communication State
-				12 AIS Transceiver Information
-				13 Altitude
-				14 Reserved for Regional Applications
-				15 Data Terminal Equipment(DTE)
-				16 AIS Spare
-				17 NMEA Reserved
-				18 Sequence ID
+				Field#	Field Description
+				1		Message ID
+				2		Repeat Indicator
+				3		User ID
+				4		Longitude
+				5		Latitude
+				6		Position Accuracy
+				7		RAIM - Flag
+				8		Time Stamp
+				9		COG
+				10		SOG
+				11		Communication State
+				12		AIS Transceiver Information
+				13		Altitude
+				14		Reserved for Regional Applications
+				15		Data Terminal Equipment(DTE)
+				16		AIS Spare
+				17		NMEA Reserved
+				18		Sequence ID
 			*/
 
-				imo = ais_msg.get_imo();
-				callsign = (char *)ais_msg.get_callsign();
-				shipname = (char *)ais_msg.get_shipname();
-				shiptype = ais_msg.get_shiptype();
-				to_port = ais_msg.get_to_port();
-				to_starboard = ais_msg.get_to_starboard();
-				to_bow = ais_msg.get_to_bow();
-				to_stern = ais_msg.get_to_stern();
-				epfd = ais_msg.get_epfd();
-				month = ais_msg.get_month();
-				day = ais_msg.get_day();
-				hour = ais_msg.get_hour();
-				minute = ais_msg.get_minute();
-				draught = ais_msg.get_draught();
-				destination = (char *)ais_msg.get_destination();
+				Altitude(m) 		4095
+				SOG = ais_msg.get_SOG();
+				accuracy = ais_msg.get_posAccuracy_flag();
+				LONG = ais_msg.get_longitude();
+				LAT = ais_msg.get_latitude();
+				LONG1 = MinToDegrees(LONG);
+				LAT1 = MinToDegrees(LAT);
+				COG = ais_msg.get_COG();
+				seconds = ais_msg.get_timeStamp();
+				11	Altitude sensor 	0 				GNSS
+				12	Spare 				0
+				13	DTE 				1 				DTE not available(default)
+				14	Spare 				0
+				15	Assign mode flag 	0 				Autonomous and continuous mode(default)				raim = ais_msg.get_raim_flag();
+				raim = ais_msg.get_raim_flag();
+				17	Comm.state selector flag	0		SOTDMA communication state follows
+				18	Communication State 165349
 
 #ifdef AIS_DEBUG
-				Serial.print("imo="); Serial.println(imo);
-				Serial.print("callsign="); Serial.println(callsign);
-				Serial.print("shipname="); Serial.println(shipname);
-				Serial.print("shiptype="); Serial.println(shiptype);
-				Serial.print("to_bow="); Serial.println(to_bow);
-				Serial.print("to_stern="); Serial.println(to_stern);
-				Serial.print("to_port="); Serial.println(to_port);
-				Serial.print("to_starboard="); Serial.println(to_starboard);
-				Serial.print("epfd="); Serial.println(epfd);
-				// Serial.print("year(now)="); Serial.println(year());
-				Serial.print("month="); Serial.println(month);
-				// Serial.print("month(now)="); Serial.println(month());
-				Serial.print("day="); Serial.println(day);
-				Serial.print("hour="); Serial.println(hour);
-				Serial.print("minute="); Serial.println(minute);
-				Serial.print("draught="); Serial.print(draught / 10); Serial.print("."); Serial.println(draught % 10);
-				Serial.print("destination="); Serial.println(destination);
+				Serial.print("SOG="); Serial.print(SOG / 10); Serial.print("."); Serial.println(SOG % 10);
+				Serial.print("Accuracy="); Serial.println(accuracy);
+				Serial.print("LONG="); Serial.println(LONG1);
+				Serial.print("LAT="); Serial.println(LAT1);
+				Serial.print("COG="); Serial.print(COG / 10); Serial.print("."); Serial.println(COG % 10);
+				Serial.print("seconds="); Serial.println(seconds);
+				Serial.print("raim="); Serial.println(raim);
 #endif
 				//SetN2kPGN129798(N2kMsg, seqMessageId, static_cast<tN2kAISRepeat>(repeat), mmsi, imo, callsign, shipname, shiptype,
 				//	to_bow + to_stern, to_port + to_starboard, to_starboard, to_bow, (2021 - 1970) * 365 + month * 30 + day,
@@ -1393,8 +1442,67 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				//pNMEA2000->SendMsg(N2kMsg);
 				//N2kTxCounter = N2kTxCounter + 1;
 			}
+#endif
 			else if (msgNumeric == 18) {
+				// !AIVDM,1,1,,A,B6CdCm0t3`tba35f@V9faHi7kP06,0*58
 				// 129039 AIS Class B Position Report			AIS VHF message 18
+				/*	
+					Parm#	Parameter			Value		Description
+					01		Message ID			18	
+					02		Repeat indicator	0			No repeat (default)
+					03		User ID (MMSI)		423302100	
+					04		Spare				15	
+					05		SOG					1.4	
+					06		Position accuracy	1			Low (> 10 m) (default)
+					07		Longitude			53*0.6598'E	
+					08		Latitude			40*0.3170'N	
+					09		COG					177	
+					10		True heading		177	
+					11		Time stamp			34	
+					12		Spare				0	
+					13		Class B unit flag	1			Class B/CS unit
+					14		Class B display flag	1		Equipped with integrated display displaying Message 12 and 14
+					15		Class B DSC flag	1			Equipped with DSC function (dedicated or time-shared)
+					16		Class B band flag	1			Capable of operating over the whole marine band
+					17		Class B Message 22 flag	1		Frequency management via Message 22
+					18		Mode flag			0			Station operating in autonomous and continuous mode (default)
+					19		RAIM-flag			0			RAIM not in use (default)
+					20		Communication state selector flag	1	ITDMA communication state follows Communication State
+					21		Sync State			3			Station is synchronized to another station based on the highest number of received stations or to another mobile station, which is directly synchronized to a base station
+					22		Slot Increment		0	
+					23		No. of slots		3			Consecutive slots
+					24		Keep flag			0
+
+					AIS Class B Position Report129039
+					This parameter group provides data associated with the ITU-R M.1371 Message 18 Standard Class B Equipment Position
+					Report.  An AIS device may generate this parameter group either upon receiving a VHF data link message 18, or upon receipt of
+					an ISO or NMEA request PGN (see ITU-R M.1371-1 for additional information).
+					Field#	Field Description
+					1		Message ID
+					2		Repeat Indicator
+					3		User ID
+					4		Longitude
+					5		Latitude
+					6		Position Accuracy
+					7		RAIM-flag
+					8		Time Stamp
+					9		COG
+					10		SOG
+					11		Communication State
+					12		AIS Transceiver Information
+					13		True Heading
+					14		Reserved for Regional Applications
+					15		Reserved for Regional Applications
+					16		Class B unit flag
+					17		Class B Display Flag
+					18		Class B DSC Flag
+					19		Class B Band Flag
+					20		Class B Msg 22 Flag
+					21		Mode Flag
+					22		Communication State Selector Flag
+					23		NMEA Reserved
+					24		Sequence ID
+				*/	
 
 				LAT = ais_msg.get_latitude();
 				LONG = ais_msg.get_longitude();
@@ -1408,11 +1516,11 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				seconds = ais_msg.get_timeStamp();
 
 #ifdef AIS_DEBUG
-				Serial.print("SOG="); Serial.println(SOG);
+				Serial.print("SOG="); Serial.print(SOG / 10); Serial.print("."); Serial.println(SOG % 10);
 				Serial.print("accuracy="); Serial.println(accuracy);
 				Serial.print("LONG="); Serial.println(LONG1);
 				Serial.print("LAT="); Serial.println(LAT1);
-				Serial.print("COG="); Serial.println(COG);
+				Serial.print("COG="); Serial.print(COG / 10); Serial.print("."); Serial.println(COG % 10);
 				Serial.print("HDG="); Serial.println(HDG);
 				Serial.print("seconds="); Serial.println(seconds);
 				Serial.print("raim="); Serial.println(raim);
@@ -1429,7 +1537,62 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				N2kTxCounter = N2kTxCounter + 1;
 			}
 			else if (msgNumeric == 19) {
+				// !AIVDM,2,1,0,B,C8u:8C@t7@TnGCKfm6Po`e6N`:Va0L2J;06HV50JV?SjBPL3,0*28
+				// !AIVDM,2,2,0,B,11RP,0*17
 				// 129040 AIS Class B Extended Position Report	AIS VHF message 19
+				/*
+				Parm#	Parameter			Value		Description
+					01	Message ID			19
+					02	Repeat indicator	0			No repeat (default)
+					03	User ID (MMSI)		601000013
+					04	Spare				15
+					05	SOG					2.9
+					06	Position accuracy	0			Low (> 10 m) (default)
+					07	Longitude			32*11.9718'E
+					08	Latitude			29*50.2488'S
+					09	COG					89
+					10	True heading		90
+					11	Time stamp			12
+					12	Spare				15
+					13	Name				TEST NAME CLSB MSG19
+					14	Type of ship&cargo	37			Pleasure Craft
+					15	Ship dimensions		A=7,B=6,C=2,D=3
+					16	Type of EPFD		1			GPS
+					17	RAIM-flag			0			RAIM not in use (default)
+					18	DTE (availability)	1			DTE not available (default)
+					19	Mode flag			0			Station operating in autonomous and continuous mode (default)
+					20	Spare				0
+
+					AIS Class B Position Report 129039
+					This parameter group provides data associated with the ITU-R M.1371 Message 18 Standard Class B Equipment Position
+					Report.  An AIS device may generate this parameter group either upon receiving a VHF data link message 18, or upon receipt of
+					an ISO or NMEA request PGN (see ITU-R M.1371-1 for additional information).
+					Field#	Field Description
+					1		Message ID
+					2		Repeat Indicator
+					3		User ID
+					4		Longitude
+					5		Latitude
+					6		Position Accuracy
+					7		RAIM-flag
+					8		Time Stamp
+					9		COG
+					10		SOG
+					11		Communication State
+					12		AIS Transceiver Information
+					13		True Heading
+					14		Reserved for Regional Applications
+					15		Reserved for Regional Applications
+					16		Class B unit flag
+					17		Class B Display Flag
+					18		Class B DSC Flag
+					19		Class B Band Flag
+					20		Class B Msg 22 Flag
+					21		Mode Flag
+					22		Communication State Selector Flag
+					23		NMEA Reserved
+					24		Sequence ID
+				*/
 
 				LAT = ais_msg.get_latitude();
 				LONG = ais_msg.get_longitude();
@@ -1450,11 +1613,11 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				epfd = ais_msg.get_epfd();
 
 #ifdef AIS_DEBUG
-				Serial.print("SOG="); Serial.println(SOG);
+				Serial.print("SOG="); Serial.print(SOG / 10); Serial.print("."); Serial.println(SOG % 10);
 				Serial.print("accuracy="); Serial.println(accuracy);
 				Serial.print("LONG="); Serial.println(LONG1);
 				Serial.print("LAT="); Serial.println(LAT1);
-				Serial.print("COG="); Serial.println(COG);
+				Serial.print("COG="); Serial.print(COG / 10); Serial.print("."); Serial.println(COG % 10);
 				Serial.print("HDG="); Serial.println(HDG);
 				Serial.print("seconds="); Serial.println(seconds);
 				Serial.print("shipname="); Serial.println(shipname);
@@ -1472,15 +1635,65 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				pNMEA2000->SendMsg(N2kMsg);
 				N2kTxCounter = N2kTxCounter + 1;
 			}
+#ifdef DATALINK
+			else if (msgNumeric == 20) {
+			// !AIVDM,1,1,,A,D02FhVQkTN ? b < `N00C8v000,2*48
+			//
+			// 	129805 AIS Data Link Management Message	                             AIS VHF message 19
+			
+				LAT = ais_msg.get_latitude();
+				LONG = ais_msg.get_longitude();
+				LAT1 = MinToDegrees(LAT);
+				LONG1 = MinToDegrees(LONG);
+				COG = ais_msg.get_COG();
+				SOG = ais_msg.get_SOG();
+				HDG = ais_msg.get_HDG();
+				accuracy = ais_msg.get_posAccuracy_flag();
+				raim = ais_msg.get_raim_flag();
+				seconds = ais_msg.get_timeStamp();
+				shipname = (char *)ais_msg.get_shipname();
+				shiptype = ais_msg.get_shiptype();
+				to_port = ais_msg.get_to_port();
+				to_starboard = ais_msg.get_to_starboard();
+				to_bow = ais_msg.get_to_bow();
+				to_stern = ais_msg.get_to_stern();
+				epfd = ais_msg.get_epfd();
+
+#ifdef AIS_DEBUG
+				Serial.print("SOG="); Serial.println(SOG);
+				Serial.print("accuracy="); Serial.println(accuracy);
+				Serial.print("LONG="); Serial.println(LONG1);
+				Serial.print("LAT="); Serial.println(LAT1);
+				Serial.print("COG="); Serial.println(COG);
+				Serial.print("HDG="); Serial.println(HDG);
+				Serial.print("seconds="); Serial.println(seconds);
+				Serial.print("shipname="); Serial.println(shipname);
+				Serial.print("shiptype="); Serial.println(shiptype);
+				Serial.print("to_bow="); Serial.println(to_bow);
+				Serial.print("to_stern="); Serial.println(to_stern);
+				Serial.print("to_port="); Serial.println(to_port);
+				Serial.print("to_starboard="); Serial.println(to_starboard);
+				Serial.print("epfd="); Serial.println(epfd);
+				Serial.print("raim="); Serial.println(raim);
+#endif
+				//SetN2kPGN129805(N2kMsg, seqMessageId, static_cast<tN2kAISRepeat>(repeat), mmsi, LAT1, LONG1,
+				//	accuracy, raim, seconds, COG*degToRad / 10, SOG*knToms / 10, HDG*degToRad, shiptype,
+				//	to_bow + to_stern, to_port + to_starboard, to_starboard, to_bow, (tN2kGNSStype)epfd, shipname);
+				//pNMEA2000->SendMsg(N2kMsg);
+				//N2kTxCounter = N2kTxCounter + 1;
+			}
+#endif
 			else if (msgNumeric == 21) {
-			// !AIVDO,2,1,5,B,E1c2;q@b44ah4ah0h:2ab@70VRpU<Bgpm4:gP50HH`Th`QF5,0*7B
-			// !AIVDO,2,2,5,B,1CQ1A83PCAH0,0*60
-			// oder
 			// !AIVDM,2,1,5,B,E1c2;q@b44ah4ah0h:2ab@70VRpU<Bgpm4:gP50HH`Th`QF5,0*79
 			// !AIVDM,2,2,5,B,1CQ1A83PCAH0,0*62
+			// oder
+			// !AIVDM,1,1,,A,ENjOsrPppg@6a9Qh1Pb0W4PP0000RRW4:fabP00000N01>,4*50
+			// oder
+			// !AIVDM,1,1,,A,ENjOsphrg@6a9Qh92SSTWh1PV0Q0Slm@:r;8000000N014R@@9,4*2A    (name: 5^ MRSC REGGIO CALAB, ext name: RIA@)
 			//
 			// 129041 AIS Aids to Navigation(AtoN) Report	AIS VHF message 21
-				/*
+				
+			/*
 			Parm#  	Parameter  			Value  			Description
 				01	Message ID			21
 				02	Repeat indicator	0				No repeat (default)
@@ -1500,79 +1713,127 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 				16	Mode Indicator		1				Assigned mode
 				17	Spare				0
 				18	Ext. Name			EXTENDED NAME
-			*/
-			/*
-			129041 AIS Aids to Navigation(AtoN) Report
+
+				129041 AIS Aids to Navigation(AtoN) Report
 				This PGN provides information received from an AtoN AIS station conforming to ITU-R M.1371-4
 				Message 21. The AtoN station maybe mounted on an aid-to-navigation or this message may be
 				transmitted by a fixed station when the functionality of an AtoN stationis integrated into the fixed station.
 				This message is typically transmitted autonomously at a rate of once every three (3) min. Otherreporting
 				rates are possible when the AtoN device has received an assigned mode command (Message 16) via the
 				VHF data link, orby an external command such as PGN 129804 - AIS Assignment Mode Command
+				Field # Field Description
+				1 Message ID
+				2 Repeat Indicator
+				3 ID
+				4 Longitude
+				5 Latitude
+				6 Position Accuracy
+				7 RAIM Flag
+				8 Time Stamp
+				9 AtoN Structure Length/Diameter
+				10 AtoN Structure Beam/Diameter
+				11 Position Reference Point from Starboard Structure Edge/Radius
+				12 Position Reference Point from True North facing Structure Edge/Radius
+				13 Aid to Navigation (AtoN) Type
+				14 Off Position Indicator
+				15 Virtual AtoN Flag
+				16 Assigned Mode Flag
+				17 AIS Spare
+				18 Electronic Fixing Position Fixing Device Type
+				19 NMEA Reserved
+				20 AtoN Status
+				21 AIS Transceiver Information
+				22 NMEA Reserved
+				23 Aid to Navigation (AtoN) Name
 			*/
 
-				imo = ais_msg.get_imo();
-				aidname = (char *)ais_msg.get_aidname();
-				LAT = ais_msg.get_latitude();
-				LONG = ais_msg.get_longitude();
-				LAT1 = MinToDegrees(LAT);
-				LONG1 = MinToDegrees(LONG);
-				to_port = ais_msg.get_to_port();
-				to_starboard = ais_msg.get_to_starboard();
-				to_bow = ais_msg.get_to_bow();
-				to_stern = ais_msg.get_to_stern();
-				accuracy = ais_msg.get_posAccuracy_flag();
-				raim = ais_msg.get_raim_flag();
-				seconds = ais_msg.get_timeStamp();
-				epfd = ais_msg.get_epfd();
-				aidnameext = (char *)ais_msg.get_aidnameext();
+			imo = ais_msg.get_imo();
+			aidname = (char *)ais_msg.get_aidname();
+			aidtype = ais_msg.get_aidtype();
+			LAT = ais_msg.get_latitude();
+			LONG = ais_msg.get_longitude();
+			LAT1 = MinToDegrees(LAT);
+			LONG1 = MinToDegrees(LONG);
+			to_port = ais_msg.get_to_port();
+			to_starboard = ais_msg.get_to_starboard();
+			to_bow = ais_msg.get_to_bow();
+			to_stern = ais_msg.get_to_stern();
+			accuracy = ais_msg.get_posAccuracy_flag();
+			raim = ais_msg.get_raim_flag();
+			seconds = ais_msg.get_timeStamp();
+			epfd = ais_msg.get_epfd();
+			aidnameext = (char *)ais_msg.get_aidnameext();
 
-				tN2kAISAtoNReportData data_tx;
+			tN2kAISAtoNReportData data_tx;
 
-				data_tx.MessageID = 21;
-				data_tx.Repeat = N2kaisr_Final;
-				data_tx.UserID = mmsi;
-				data_tx.SetAtoNName(aidname);
-				data_tx.Longitude = LONG;
-				data_tx.Latitude = LAT;
-				data_tx.Accuracy = accuracy;
-				data_tx.RAIM = raim;
-				data_tx.Seconds = seconds;
-				data_tx.Length = to_bow+to_stern;
-				data_tx.Beam = to_port+to_starboard;
-				data_tx.PositionReferenceStarboard = to_starboard;
-				data_tx.PositionReferenceTrueNorth = to_bow;
-				data_tx.AtoNType = N2kAISAtoN_beacon_isolated_danger;
-				data_tx.OffPositionIndicator = true;
-				data_tx.VirtualAtoNFlag = true;
-				data_tx.AssignedModeFlag = true;
-				data_tx.GNSSType = N2kGNSSt_Chayka;
-				data_tx.AtoNStatus = 0x00;
-				data_tx.AISTransceiverInformation = N2kaischannel_B_VDL_transmission;
-//				data_tx.SetAtoNNameext = aidnameext;
+			data_tx.MessageID = 21;
+			data_tx.Repeat = N2kaisr_Final;
+			data_tx.UserID = mmsi;
+			strcat(aidname, aidnameext);
+			data_tx.SetAtoNName(aidname);
+			data_tx.AtoNType = (tN2kAISAtoNType)aidtype;
+			data_tx.Longitude = LONG1;
+			data_tx.Latitude = LAT1;
+			data_tx.Accuracy = accuracy;
+			data_tx.RAIM = raim;
+			data_tx.Seconds = seconds;
+			data_tx.Length = to_bow+to_stern;
+			data_tx.Beam = to_port+to_starboard;
+			data_tx.PositionReferenceStarboard = to_starboard;
+			data_tx.PositionReferenceTrueNorth = to_bow;
+			data_tx.OffPositionIndicator = true;
+			data_tx.VirtualAtoNFlag = true;
+			data_tx.AssignedModeFlag = true;
+			data_tx.GNSSType = N2kGNSSt_Chayka;
+			data_tx.AtoNStatus = 0x00;
+			data_tx.AISTransceiverInformation = N2kaischannel_B_VDL_transmission;
 
 #ifdef AIS_DEBUG
-				Serial.print("aidname="); Serial.println(aidname);
-				Serial.print("imo="); Serial.println(imo);
-				Serial.print("LONG="); Serial.println(LONG1);
-				Serial.print("LAT="); Serial.println(LAT1);
-				Serial.print("to_bow="); Serial.println(to_bow);
-				Serial.print("to_stern="); Serial.println(to_stern);
-				Serial.print("to_port="); Serial.println(to_port);
-				Serial.print("to_starboard="); Serial.println(to_starboard);
-				Serial.print("epfd="); Serial.println(epfd);
-				Serial.print("aidnameext="); Serial.println(aidnameext);
+			Serial.print("aidname="); Serial.println(aidname);
+			Serial.print("aidtype="); Serial.println(aidtype);
+			Serial.print("mmsi="); Serial.println(mmsi);
+			Serial.print("LONG="); Serial.println(LONG1);
+			Serial.print("LAT="); Serial.println(LAT1);
+			Serial.print("seconds="); Serial.println(seconds);
+			Serial.print("to_bow="); Serial.println(to_bow);
+			Serial.print("to_stern="); Serial.println(to_stern);
+			Serial.print("to_port="); Serial.println(to_port);
+			Serial.print("to_starboard="); Serial.println(to_starboard);
+			Serial.print("epfd="); Serial.println(epfd);
+			Serial.print("aidnameext="); Serial.println(aidnameext);
+			Serial.print("data_tx="); Serial.println(data_tx.AtoNName);
 #endif
-				SetN2kPGN129041(N2kMsg, data_tx);
-				pNMEA2000->SendMsg(N2kMsg);
-				N2kTxCounter = N2kTxCounter + 1;
-			}
-			else if (msgNumeric == 24) {
-				// 129809 AIS Class B "CS" Static Data, Part A	AIS VHF message 24
+			SetN2kAISAtoNReport(N2kMsg, data_tx);      // PGN 129041
+			pNMEA2000->SendMsg(N2kMsg);
+			N2kTxCounter = N2kTxCounter + 1;
+		}
+		else if (msgNumeric == 24)
+		{
 				// !AIVDM,1,1,,B,H42M;bh4hTq@E8VoT0000000003,2*3F
-				// 129810 AIS Class B "CS" Static Data, Part B	AIS VHF message 24
-				// !AIVDM,1,1,,B,H42M;blti1hhllqD31jmni00g0=0,0*52
+				// 129809 AIS Class B "CS" Static Data, Part A	AIS VHF message 24
+				/*
+					Parm#	Parameter			Value		Description
+					01		Message ID			24
+					02		Repeat indicator	0
+					03		User ID (MMSI)		271010731
+					04		Message part number	0			0: Part A
+					05		Name				ALINTERI-9@@@@@@@@@@
+				*/
 
+				// !AIVDM,1,1,,B,H42M;blti1hhllqD31jmni00g0=0,0*52
+				// 129810 AIS Class B "CS" Static Data, Part B	AIS VHF message 24
+				/*
+					Parm#	Parameter			Value		Description  ↓
+					01		Message ID			24
+					02		Repeat indicator	0
+					03		User ID (MMSI)		271010731
+					04		Message part number	1			1: Part B
+					05		Type of ship & cargo	60		Passenger, all ships of this type
+					06		Vendor ID			1A00449
+					07		Call sign			TCA2561
+					08		Ship dimensions		A=0,B=47,C=0,D=13
+					09		Spare				0
+				*/
 				if (part_no == 0) {
 					//
 					// Part A

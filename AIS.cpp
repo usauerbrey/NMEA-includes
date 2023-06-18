@@ -1,3 +1,26 @@
+/**********************************************************************
+  AIS.cpp - Copyright (c) 2016-2020 Kim Bøndergaarg <kim@fam-boendergaard.dk>
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  ``Software''), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+ **********************************************************************/
 
 
 #include "AIS.h"
@@ -37,6 +60,7 @@ const uint16_t AIS::AisParamLength[] = {
 		6,   // AIS_PARAM_U8_TO_PORT,
 		6,   // AIS_PARAM_U8_TO_STARBOARD,
 		4,   // AIS_PARAM_E_EPFD,
+		14,  // AIS_PARAM_U16_YEAR,
 		4,   // AIS_PARAM_U8_MONTH,
 		5,   // AIS_PARAM_U8_DAY,
 		5,   // AIS_PARAM_U8_HOUR,
@@ -51,22 +75,29 @@ const uint16_t AIS::AisParamLength[] = {
 		1,   // AIS_PARAM_B_MSG22,
 		1,   // AIS_PARAM_B_ASSIGNED,
 		2,   // AIS_PARAM_U8_PARTNO,
-		18,  // AIS_PARAM_T_VENDORID,
+		42,  // AIS_PARAM_T_VENDORID,
 		4,   // AIS_PARAM_U8_MODEL,
 		20,  // AIS_PARAM_U32_SERIAL,
 		30,  // AIS_PARAM_U32_MOTHERSHIP_MMSI,
+		5,   // AIS_PARAM_B_AIDTYPE,
+		120, // AIS_PARAM_T_AIDNAME,
+		1,   // AIS_PARAM_B_OFFPOS,
+		1,   // AIS_PARAM_B_VIRTUALAID,
+		88,  // AIS_PARAM_T_AIDNAMEEXT,
 };
 
 const struct AIS::AisTypeMsgPair AIS::AisMsgTypes[] = {
-		{ AIS_MSG_1_2_3_POS_REPORT_CLASS_A,		 1 },
-		{ AIS_MSG_1_2_3_POS_REPORT_CLASS_A,		 2 },
-		{ AIS_MSG_1_2_3_POS_REPORT_CLASS_A,		 3 },
-		{ AIS_MSG_4_BASE_STATION_REPORT,		 4 },
-		{ AIS_MSG_5_STATIC_AND_VOYAGE,			 5 },
-		{ AIS_MSG_18_CS_POS_REPORT_CLASS_B,		18 },
+		{ AIS_MSG_1_2_3_POS_REPORT_CLASS_A, 1 },
+		{ AIS_MSG_1_2_3_POS_REPORT_CLASS_A, 2 },
+		{ AIS_MSG_1_2_3_POS_REPORT_CLASS_A, 3 },
+		{ AIS_MSG_4_BASE_STATION_REPORT,    4 },
+		{ AIS_MSG_5_STATIC_AND_VOYAGE,      5 },
+		{ AIS_MSG_18_CS_POS_REPORT_CLASS_B, 18 },
         { AIS_MSG_19_CS_POS_REPORT_EXT_CLASS_B, 19 },
-		{ AIS_MSG_24_STATIC_DATA_REPORT,		24 },
-		{ AIS_MSG_MAX,							 0 } // Must be last
+		{ AIS_MSG_21_AIDS_TO_NAV_REPORT,    21 },
+		{ AIS_MSG_24_STATIC_DATA_REPORT,    24 },
+		{ AIS_MSG_DUMMY_DATA_REPORT,        25 },
+		{ AIS_MSG_MAX, 0 } // Must be last
 };
 
 const struct AIS::AisParamPosPair AIS::AisMsgPosReportClassA[] = {
@@ -86,6 +117,17 @@ const struct AIS::AisParamPosPair AIS::AisMsgPosReportClassA[] = {
 };
 
 const struct AIS::AisParamPosPair AIS::AisMsgBaseStationReport[] = {
+		{ AIS_PARAM_U16_YEAR,         38 },
+		{ AIS_PARAM_U8_MONTH,         52 },
+		{ AIS_PARAM_U8_DAY,           56 },
+		{ AIS_PARAM_U8_HOUR,          61 },
+		{ AIS_PARAM_U8_MINUTE,        66 },
+		{ AIS_PARAM_U8_SECOND,        72 },
+		{ AIS_PARAM_B_ACCURACY,       78 },
+		{ AIS_PARAM_I32_LONG,         79 },
+		{ AIS_PARAM_I32_LAT,         107 },
+		{ AIS_PARAM_E_EPFD,          134 },
+		{ AIS_PARAM_B_RAIM,          148 },
 		{ AIS_PARAM_MAX, 0 } // Must be last
 };
 
@@ -128,24 +170,50 @@ const struct AIS::AisParamPosPair AIS::AisMsgCsPosReportClassB[] = {
 		{ AIS_PARAM_U32_RADIO,       148 },
 		{ AIS_PARAM_MAX, 0 } // Must be last
 };
+
 const struct AIS::AisParamPosPair AIS::AisMsgCsPosReportExtClassB[] = {
-                { AIS_PARAM_U16_SOG,          46 },
-                { AIS_PARAM_B_ACCURACY,       56 },
-                { AIS_PARAM_I32_LONG,         57 },
-                { AIS_PARAM_I32_LAT,          85 },
-                { AIS_PARAM_U16_COG,         112 },
-                { AIS_PARAM_U16_HEADING,     124 },
-                { AIS_PARAM_U8_SECOND,       133 },
-                { AIS_PARAM_T_SHIPNAME,      143 },
-                { AIS_PARAM_E_SHIPTYPE,      263 },
-                { AIS_PARAM_U16_TO_BOW,      271 },
-                { AIS_PARAM_U16_TO_STERN,    280 },
-                { AIS_PARAM_U8_TO_PORT,      289 },
-                { AIS_PARAM_U8_TO_STARBOARD, 295 },
-                { AIS_PARAM_MAX, 0 } // Must be last
+        { AIS_PARAM_U16_SOG,          46 },
+        { AIS_PARAM_B_ACCURACY,       56 },
+        { AIS_PARAM_I32_LONG,         57 },
+        { AIS_PARAM_I32_LAT,          85 },
+        { AIS_PARAM_U16_COG,         112 },
+        { AIS_PARAM_U16_HEADING,     124 },
+        { AIS_PARAM_U8_SECOND,       133 },
+//      { regional,                  139 }, // Not implemented
+        { AIS_PARAM_T_SHIPNAME,      143 },
+        { AIS_PARAM_E_SHIPTYPE,      263 },
+        { AIS_PARAM_U16_TO_BOW,      271 },
+        { AIS_PARAM_U16_TO_STERN,    280 },
+        { AIS_PARAM_U8_TO_PORT,      289 },
+        { AIS_PARAM_U8_TO_STARBOARD, 295 },
+        { AIS_PARAM_E_EPFD,          301 },
+        { AIS_PARAM_B_RAIM,          305 },
+        { AIS_PARAM_B_DTE,           306 },
+        { AIS_PARAM_B_ASSIGNED,      307 },
+        { AIS_PARAM_MAX, 0 } // Must be last
 };
 
-const struct AIS::AisParamPosPair AIS::AisMsgStaticDataRaport[] = {
+const struct AIS::AisParamPosPair AIS::AisMsgAidsToNavReport[] = {
+		{ AIS_PARAM_B_AIDTYPE,        38 },
+		{ AIS_PARAM_T_AIDNAME,        43 },
+		{ AIS_PARAM_B_ACCURACY,      163 },
+		{ AIS_PARAM_I32_LONG,        164 },
+		{ AIS_PARAM_I32_LAT,         192 },
+		{ AIS_PARAM_U16_TO_BOW,      219 },
+		{ AIS_PARAM_U16_TO_STERN,    228 },
+		{ AIS_PARAM_U8_TO_PORT,      237 },
+		{ AIS_PARAM_U8_TO_STARBOARD, 243 },
+		{ AIS_PARAM_E_EPFD,          249 },
+		{ AIS_PARAM_U8_SECOND,       253 },
+		{ AIS_PARAM_B_OFFPOS,        259 },
+		{ AIS_PARAM_B_RAIM,          268 },
+		{ AIS_PARAM_B_VIRTUALAID,    269 },
+		{ AIS_PARAM_B_ASSIGNED,      270 },
+		{ AIS_PARAM_T_AIDNAMEEXT,    272 },
+		{ AIS_PARAM_MAX, 0 } // Must be last
+};
+
+const struct AIS::AisParamPosPair AIS::AisMsgStaticDataReport[] = {
 		{ AIS_PARAM_U8_PARTNO,        38 }, // A-B switch
 		{ AIS_PARAM_T_SHIPNAME,       40 }, // A
 		{ AIS_PARAM_E_SHIPTYPE,       40 }, // B
@@ -162,12 +230,14 @@ const struct AIS::AisParamPosPair AIS::AisMsgStaticDataRaport[] = {
 };
 
 const struct AIS::AisParamPosPair* AIS::AisMsgParams[AIS_MSG_MAX] = {
+		&AisMsgPosReportClassA[0],     // Dummy
 		&AisMsgPosReportClassA[0],
-//		&AisMsgBaseStationReport[0],
-		&AisMsgPosReportClassA[0],
+		&AisMsgBaseStationReport[0],
 		&AisMsgStaticAndVoyage[0],
 		&AisMsgCsPosReportClassB[0],
-		&AisMsgStaticDataRaport[0]
+		&AisMsgCsPosReportExtClassB[0],
+		&AisMsgAidsToNavReport[0],
+		&AisMsgStaticDataReport[0]
 };
 
 AIS::AIS(const char *AISbitstream, unsigned int fillBits)
@@ -306,20 +376,19 @@ bool AIS::getdata(unsigned int begin, unsigned int cnt, uint8_t *data, bool isSi
 
 bool AIS::getParamStart(enum AIS::Nmea0183AisParams param, unsigned& start)
 {
-	if (msgType == AIS_MSG_MAX) {
-		return false;
-	}
-
-	if (msgType == AIS_MSG_1_2_3_POS_REPORT_CLASS_A) {
-		msgType = AIS_MSG_4_BASE_STATION_REPORT;
-	}
-
-//	Serial.print("param="); Serial.print(param); Serial.print(", msgType="); Serial.print(msgType); Serial.print(", start="); Serial.println(start);
-
-	const struct AisParamPosPair* pparam = AisMsgParams[msgType];
+    if(msgType==AIS_MSG_MAX)return false;
+	const struct AisParamPosPair* pparam;
+	pparam = AisMsgParams[msgType+1];   // Verschiebung um eins nach hinten, die Null gibt irgendwie flasche Adressen zurück, k.A. warum
+//	Serial.print("msgType="); Serial.println(msgType+1);
+//	Serial.printf("Addr of pparam= %p\n", (const void *)&pparam);
+//	Serial.printf("Memory representation of pparam: ");
+//	for (size_t i = 0; i < sizeof(pparam); ++i) {
+//		Serial.printf("%02X ", ((unsigned char *)&pparam)[i]);
+//	}
+//	Serial.printf("\n");
 
 	while (pparam->param != AIS_PARAM_MAX) {
-//		Serial.print("pparam->param="); Serial.print(pparam->param); Serial.print("pparam->start="); Serial.println(pparam->start);
+//		Serial.print("pparam->param="); Serial.print(pparam->param); Serial.print(",  pparam->start="); Serial.println(pparam->start);
 		if (pparam->param == param) {
 			start = pparam->start;
 //			Serial.print("start="); Serial.println(start);
@@ -381,7 +450,6 @@ int32_t AIS::get_i32(enum AIS::Nmea0183AisParams param)
 		return 0;
 	}
 	unsigned int len = AisParamLength[param];
-//	Serial.print("start="); Serial.print(start); Serial.print(", len="); Serial.println(len);
 	return get_i32(start,len);
 }
 
@@ -467,7 +535,7 @@ void AIS::get_string(char* str, unsigned start, unsigned cnt)
 
 
 
-char* AIS::get_string(enum AIS::Nmea0183AisParams param, char* str)
+const char* AIS::get_string(enum AIS::Nmea0183AisParams param, char* str)
 {
 	unsigned int start;
 	if (! getParamStart(param, start)) {

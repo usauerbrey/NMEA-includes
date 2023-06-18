@@ -1,3 +1,27 @@
+/**********************************************************************
+  AIS.h - Copyright (c) 2016-2020 Kim Bøndergaarg <kim@fam-boendergaard.dk>
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  ``Software''), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED ``AS IS'', WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+ **********************************************************************/
+
 
 #ifndef _AIS_H_
 #define _AIS_H_
@@ -17,8 +41,10 @@ public:
 		AIS_MSG_4_BASE_STATION_REPORT,
 		AIS_MSG_5_STATIC_AND_VOYAGE,
 		AIS_MSG_18_CS_POS_REPORT_CLASS_B,
-		AIS_MSG_19_CS_POS_REPORT_EXT_CLASS_B,
+        AIS_MSG_19_CS_POS_REPORT_EXT_CLASS_B,
+		AIS_MSG_21_AIDS_TO_NAV_REPORT,
 		AIS_MSG_24_STATIC_DATA_REPORT,
+		AIS_MSG_DUMMY_DATA_REPORT,
 
 		AIS_MSG_MAX,
 	};
@@ -26,7 +52,7 @@ public:
 
 public:
 	AIS(const char *AISbitstream, unsigned int fillBits = 0);
-	static const int msg_max = 500;
+	static const int msg_max = 60;
 	bool getdata(unsigned int begin, unsigned int cnt, uint8_t *data, bool isigned = false);
 
 	// Fixed position parameters
@@ -57,7 +83,9 @@ public:
 	uint8_t get_hour() {return get_u8(AIS_PARAM_U8_HOUR); };
 	uint8_t get_minute() {return get_u8(AIS_PARAM_U8_MINUTE); };
 	uint8_t get_partno() {return get_u8(AIS_PARAM_U8_PARTNO); };
+	uint8_t get_aidtype() { return get_u8(AIS_PARAM_B_AIDTYPE); };
 
+	uint16_t get_year() { return get_u16(AIS_PARAM_U16_YEAR); };
 	uint16_t get_SOG() {return get_u16(AIS_PARAM_U16_SOG); };
 	uint16_t get_COG() {return get_u16(AIS_PARAM_U16_COG); };
 	uint16_t get_HDG() {return get_u16(AIS_PARAM_U16_HEADING); };
@@ -78,10 +106,12 @@ public:
 	bool get_msg22_flag() {return get_flag(AIS_PARAM_B_MSG22);};
 	bool get_assigned_flag() {return get_flag(AIS_PARAM_B_ASSIGNED);};
 
-	char* get_shipname() { return get_string(AIS_PARAM_T_SHIPNAME, shipname);};
-	char* get_destination() { return get_string(AIS_PARAM_T_DESTINATION, destination);};
-	char* get_callsign() { return get_string(AIS_PARAM_T_CALLSIGN, callsign);};
-	char* get_vendorid() { return get_string(AIS_PARAM_T_VENDORID, vendorid);};
+	const char* get_shipname() { return get_string(AIS_PARAM_T_SHIPNAME, shipname);};
+	const char* get_destination() { return get_string(AIS_PARAM_T_DESTINATION, destination);};
+	const char* get_callsign() { return get_string(AIS_PARAM_T_CALLSIGN, callsign);};
+	const char* get_vendorid() { return get_string(AIS_PARAM_T_VENDORID, vendorid);};
+	const char* get_aidname() { return get_string(AIS_PARAM_T_AIDNAME, atonname); };
+	const char* get_aidnameext() { return get_string(AIS_PARAM_T_AIDNAMEEXT, atonnameext); };
 
 private:
 	enum Nmea0183AisParams {
@@ -109,6 +139,7 @@ private:
 		AIS_PARAM_U8_TO_PORT,
 		AIS_PARAM_U8_TO_STARBOARD,
 		AIS_PARAM_E_EPFD,
+		AIS_PARAM_U16_YEAR,
 		AIS_PARAM_U8_MONTH,
 		AIS_PARAM_U8_DAY,
 		AIS_PARAM_U8_HOUR,
@@ -127,6 +158,11 @@ private:
 		AIS_PARAM_U8_MODEL,
 		AIS_PARAM_U32_SERIAL,
 		AIS_PARAM_U32_MOTHERSHIP_MMSI,
+		AIS_PARAM_B_AIDTYPE,
+		AIS_PARAM_T_AIDNAME,
+		AIS_PARAM_B_OFFPOS,
+		AIS_PARAM_B_VIRTUALAID,
+		AIS_PARAM_T_AIDNAMEEXT,
 
 		AIS_PARAM_MAX,
 	};
@@ -150,8 +186,9 @@ private:
 	static const struct AisParamPosPair AisMsgBaseStationReport[];
 	static const struct AisParamPosPair AisMsgStaticAndVoyage[];
 	static const struct AisParamPosPair AisMsgCsPosReportClassB[];
-	static const struct AisParamPosPair AisMsgCsPosReportExtClassB[];
-	static const struct AisParamPosPair AisMsgStaticDataRaport[];
+    static const struct AisParamPosPair AisMsgCsPosReportExtClassB[];
+	static const struct AisParamPosPair AisMsgAidsToNavReport[];
+	static const struct AisParamPosPair AisMsgStaticDataReport[];
 
 private:
 	void decode(unsigned int fillBits);
@@ -172,7 +209,7 @@ private:
 	uint8_t get_u8(enum Nmea0183AisParams param);
 
 	void get_string(char* str, unsigned start, unsigned cnt);
-	char* get_string(enum Nmea0183AisParams param, char* str);
+	const char* get_string(enum Nmea0183AisParams param, char* str);
 	bool get_flag(enum Nmea0183AisParams param);
 
 	enum Nmea0183AisMessages numericToMessage(uint8_t msgNumeric);
@@ -180,10 +217,12 @@ private:
 
 private:
 	static const uint8_t bits_pr_char = 6;
-	static const uint8_t shipname_strlen = 20; // a bits
-	static const uint8_t destination_strlen = 20; // a bits
-	static const uint8_t callsign_strlen = 7; // a 6 bits
-	static const uint8_t vendorid_strlen = 3; // a 6 bits
+	static const uint8_t shipname_strlen = 20;		// a 6 bits
+	static const uint8_t destination_strlen = 20;	// a 6 bits
+	static const uint8_t callsign_strlen = 7;		// a 6 bits
+	static const uint8_t vendorid_strlen = 7;		// a 6 bits
+	static const uint8_t aidname_strlen = 20;		// a 6 bits
+	static const uint8_t aidnameext_strlen = 20;	// a 6 bits
 
 	uint8_t msg[msg_max];
 	unsigned int msgLen;
@@ -194,6 +233,8 @@ private:
 	char destination[destination_strlen+1];
 	char callsign[callsign_strlen+1];
 	char vendorid[vendorid_strlen+1];
+	char atonname[aidname_strlen + 1];
+	char atonnameext[aidnameext_strlen + 1];
 };
 
 

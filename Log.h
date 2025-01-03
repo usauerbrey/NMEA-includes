@@ -44,8 +44,8 @@ Author: Ton Swieb
 class Logger {
 
   private:
-    byte debugLevel;
     Stream* logger;
+    byte debugLevel;
     PrintfWrapper* printfWrapper;
 
   public:

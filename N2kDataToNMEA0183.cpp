@@ -51,7 +51,9 @@ extern tNMEA2000 &NMEA2000;
 tNMEA0183Msg NMEA0183MsgDBT;
 tNMEA0183Msg NMEA0183MsgVHW;
 
-//*****************************************************************************
+/**
+ * @brief Convert Double to ddmm.
+ */
 double DoubleToddmm(double val) {
 	if (val != NMEA0183DoubleNA) {
 		double intpart;

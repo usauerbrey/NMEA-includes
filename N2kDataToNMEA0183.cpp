@@ -556,6 +556,9 @@ void tN2kDataToNMEA0183::HandleWindSpeed(const tN2kMsg &N2kMsg) {
 		if ( WindAngleDeg > 360 ) {
 			WindAngleDeg = WindAngleDeg - 360;
 		}
+		if (WindAngleDeg < 0) {
+			WindAngleDeg = WindAngleDeg + 360;
+		}
 
 		SetN2kPGN130306(N2kMsg130306, SID, WindSpeed, DegToRad(WindAngleDeg), WindReference);
 		NMEA2000.SendMsg(N2kMsg130306);

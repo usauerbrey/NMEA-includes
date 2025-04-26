@@ -22,8 +22,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "N2kDataToNMEA0183.h"
-#include <N2kMessages.h>
-#include <NMEA0183Messages.h>
+#include "N2kMessages.h"
+#include "NMEA0183Messages.h"
 
 #define pi 3.1415926535897932384626433832795
 #define kmhToms 1000.0 / 3600.0
@@ -520,16 +520,46 @@ MWV - Wind Speed and Angle
   5) Status, A = Data Valid 
   6) Checksum
 
+
+MWD - Wind Direction and Speed
+		1   2 3   4 5   6 7   8
+		|   | |   | |   | |   |
+ $--MWD,x.x,a,x.x,a,x.x,a,x.x,a*hh<CR><LF>
+
+ Field Number:
+  1) Wind Direction, 0.0 to 359.9 degrees
+  2) Reference, R = Relative, T = True
+  3) Wind Direction, 0.0 to 359.9 degrees
+  4) Reference, M = Magnetic, T = True
+  5) Wind Speed, knots, to the nearest 0.1 knot
+  6) Wind Speed Units, K/M/N
+  7) Wind speed, meters/second, to the nearest 0.1 m/s.
+  8) Wind Speed Units, M = Meters/second
+  9) Checksum
+
 */
   
 void tN2kDataToNMEA0183::HandleWindSpeed(const tN2kMsg &N2kMsg) {
 	unsigned char SID;
 	double WindSpeed;
 	double WindAngle;
+	double WindAngleDeg;
 	tN2kWindReference WindReference;
+
+	tN2kMsg N2kMsg130306;
 
 	if ( ParseN2kWindSpeed(N2kMsg,SID,WindSpeed,WindAngle,WindReference) ) {
 		tNMEA0183Msg NMEA0183Msg;
+
+		WindAngleDeg = RadToDeg(WindAngle);
+		WindAngleDeg = WindAngleDeg + 10;
+		if ( WindAngleDeg > 360 ) {
+			WindAngleDeg = WindAngleDeg - 360;
+		}
+
+		SetN2kPGN130306(N2kMsg130306, SID, WindSpeed, DegToRad(WindAngleDeg), WindReference);
+		NMEA2000.SendMsg(N2kMsg130306);
+		N2kTxCounter = N2kTxCounter + 1;
 
 		if ( WindReference==N2kWind_Apprent ) {
 			if ( NMEA0183SetMWV(NMEA0183Msg,RadToDeg(WindAngle),NMEA0183Wind_Apparent,WindSpeed) ) {

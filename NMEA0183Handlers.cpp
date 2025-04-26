@@ -13,10 +13,10 @@ Author: Timo Lappalainen
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 */
  
-#include <N2kMsg.h>
-#include <NMEA2000.h>
-#include <N2kMessages.h>
-#include <NMEA0183Messages.h>
+#include "N2kMsg.h"
+#include "NMEA2000.h"
+#include "N2kMessages.h"
+#include "NMEA0183Messages.h"
 #include "NMEA0183Handlers.h"
 #include "AIS.h"
 

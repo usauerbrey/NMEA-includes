@@ -13,10 +13,10 @@ Author: Timo Lappalainen
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 */
  
-#include <N2kMsg.h>
-#include <NMEA2000.h>
-#include <N2kMessages.h>
-#include <NMEA0183Messages.h>
+#include "N2kMsg.h"
+#include "NMEA2000.h"
+#include "N2kMessages.h"
+#include "NMEA0183Messages.h"
 #include "NMEA0183Handlers.h"
 #include "AIS.h"
 
@@ -949,15 +949,15 @@ void HandleVDM(const tNMEA0183Msg &NMEA0183Msg) {
 	uint8_t aidtype;
 	char name[120];
 	char *shipname = name;
-	char dest[20];
+	char dest[120];
 	char *destination = dest;
 	char sign[42];
 	char *callsign = sign;
-	char vendor[18];
+	char vendor[42];
 	const char *vendorid = vendor;
 	char name1[120];
 	char *aidname = name1;
-	char name2[88];
+	char name2[120];
 	char *aidnameext = name2;
 
 	length = 500;

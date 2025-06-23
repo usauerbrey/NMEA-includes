@@ -22,8 +22,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "N2kDataToNMEA0183.h"
-#include <N2kMessages.h>
-#include <NMEA0183Messages.h>
+#include "N2kMessages.h"
+#include "NMEA0183Messages.h"
 
 #define pi 3.1415926535897932384626433832795
 #define kmhToms 1000.0 / 3600.0
@@ -148,7 +148,7 @@ void tN2kDataToNMEA0183::HandleMsg(const tN2kMsg &N2kMsg) {
 			N2kHandlersDebugStream->println(N2KDebugMsgs[i].N2KMsg);
 		}
     }
-
+//#define debug
 #ifdef debug
 	Serial.print("N2k message parsed: ");
 	Serial.print(N2kMsg.PGN);
@@ -382,7 +382,7 @@ void tN2kDataToNMEA0183::HandleHeading(const tN2kMsg &N2kMsg) {
 
 //	Serial1.print("N2K Heading message parsed, source: ");
 //	Serial1.println(N2kMsg.Source);
-	if (N2kMsg.Source == 36) {
+	if (N2kMsg.Source == 38) {
 		if (ParseN2kHeading(N2kMsg, SID, Heading, Deviation, _Variation, ref)) {
 			if (ref == N2khr_magnetic) {
 				if (!N2kIsNA(_Variation)) Variation = _Variation; // Update Variation
@@ -520,16 +520,50 @@ MWV - Wind Speed and Angle
   5) Status, A = Data Valid 
   6) Checksum
 
+
+MWD - Wind Direction and Speed
+		1   2 3   4 5   6 7   8
+		|   | |   | |   | |   |
+ $--MWD,x.x,a,x.x,a,x.x,a,x.x,a*hh<CR><LF>
+
+ Field Number:
+  1) Wind Direction, 0.0 to 359.9 degrees
+  2) Reference, R = Relative, T = True
+  3) Wind Direction, 0.0 to 359.9 degrees
+  4) Reference, M = Magnetic, T = True
+  5) Wind Speed, knots, to the nearest 0.1 knot
+  6) Wind Speed Units, K/M/N
+  7) Wind speed, meters/second, to the nearest 0.1 m/s.
+  8) Wind Speed Units, M = Meters/second
+  9) Checksum
+
 */
   
 void tN2kDataToNMEA0183::HandleWindSpeed(const tN2kMsg &N2kMsg) {
 	unsigned char SID;
 	double WindSpeed;
 	double WindAngle;
+	double WindAngleDeg;
 	tN2kWindReference WindReference;
+
+	tN2kMsg N2kMsg130306;
 
 	if ( ParseN2kWindSpeed(N2kMsg,SID,WindSpeed,WindAngle,WindReference) ) {
 		tNMEA0183Msg NMEA0183Msg;
+
+
+		WindAngleDeg = RadToDeg(WindAngle);
+		WindAngleDeg = WindAngleDeg - 20;
+		if ( WindAngleDeg > 360 ) {
+			WindAngleDeg = WindAngleDeg - 360;
+		}
+		if (WindAngleDeg < 0) {
+			WindAngleDeg = WindAngleDeg + 360;
+		}
+
+		SetN2kPGN130306(N2kMsg130306, SID, WindSpeed, DegToRad(WindAngleDeg), WindReference);
+		NMEA2000.SendMsg(N2kMsg130306);
+		N2kTxCounter = N2kTxCounter + 1;
 
 		if ( WindReference==N2kWind_Apprent ) {
 			if ( NMEA0183SetMWV(NMEA0183Msg,RadToDeg(WindAngle),NMEA0183Wind_Apparent,WindSpeed) ) {
@@ -570,7 +604,7 @@ $--GLL,llll.ll,a,yyyyy.yy,a,hhmmss.ss,A*hh<CR><LF>
 void tN2kDataToNMEA0183::HandlePosition(const tN2kMsg &N2kMsg) {
 	tNMEA0183Msg NMEA0183Msg;
 
-	if (N2kMsg.Source == 36) {
+	if (N2kMsg.Source == 38) {
 		if (ParseN2kPGN129025(N2kMsg, Latitude, Longitude)) {
 			LastPositionTime = millis();
 			if (N2kHandlersDebugStream != 0) {
@@ -623,7 +657,7 @@ void tN2kDataToNMEA0183::HandleCOGSOG(const tN2kMsg &N2kMsg) {
 	tN2kHeadingReference HeadingReference;
 	tNMEA0183Msg NMEA0183Msg;
 
-	if (N2kMsg.Source == 36) {
+	if (N2kMsg.Source == 38) {
 		if (ParseN2kCOGSOGRapid(N2kMsg, SID, HeadingReference, COG, SOG)) {
 			LastCOGSOGTime = millis();
 			double MCOG = (!N2kIsNA(COG) && !N2kIsNA(Variation) ? COG - Variation : NMEA0183DoubleNA);
@@ -701,7 +735,7 @@ void tN2kDataToNMEA0183::HandleGNSS(const tN2kMsg &N2kMsg) {
 	int GPSQualityIndicator = 0;
 	tNMEA0183Msg NMEA0183Msg;
 
-	if (N2kMsg.Source == 36) {
+	if (N2kMsg.Source == 38) {
 		if (ParseN2kGNSS(N2kMsg, SID, DaysSince1970, SecondsSinceMidnight, Latitude, Longitude, Altitude, GNSStype, GNSSmethod,
 			nSatellites, HDOP, PDOP, GeoidalSeparation, nReferenceStations, ReferenceStationType, ReferenceStationID, AgeOfCorrection)) {
 			LastPositionTime = millis();
